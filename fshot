@@ -1,3 +1,5 @@
+#!/usr/bin/env perl
+
 use strict;
 use warnings;
 
@@ -8,13 +10,13 @@ use Digest::SHA qw(sha256_hex);
 
 my $path = ".";
 my @ignore_exts;
-my $ignore_hidden = 1;
+my $scan_hidden = 0;
 my $quiet = '';
 my $help = '';
 
 GetOptions("path=s" => \$path, 
 	"ignore-ext=s@" => \@ignore_exts, 
-	"ignore-hidden" => \$ignore_hidden,
+	"scan-hidden" => \$scan_hidden,
 	"quiet" => \$quiet,
 	"help" => \$help)
 	or pod2usage(2);
@@ -37,12 +39,6 @@ sub file_hash {
     # Getting file contents
     open(my $fh, "<:raw", "$file_path") or die "Failed to open file: $file_path\n";
 
-    # If it's empty, just hash an empty string
-    # TODO: I don't think this is necessary though
-    if (-s $fh == 0) {
-	return sha256_hex('');
-    }
-
     # Getting our hash value
     my $sha = Digest::SHA->new(256);
     $sha->addfile($fh);
@@ -56,17 +52,29 @@ sub file_hash {
 sub process_file {
     my ($files) = @_;
 
+    # Stipping `./`
+    my $file = $File::Find::name;
+    $file =~ s{^\./}{};
+    
+
+    my $first_char = substr($file, 0, 1);
+
+    # Idk why the second needs to be negated...
+    if ($first_char eq '.' && !$scan_hidden) {
+	return;
+    }
+
     # Setting a placeholder for directories
-    if (-d $File::Find::name) {
-	$files->{$File::Find::name} = 'dir';
+    if (-d $file) {
+	$files->{$file} = 'dir';
 	return;
     }
 
     if (!$quiet) {
-	print "Found: $File::Find::name\n";
+	print "Found: $file\n";
     }
     
-    $files->{$File::Find::name} = file_hash($File::Find::name);
+    $files->{$file} = file_hash($file);
 }
 
 
